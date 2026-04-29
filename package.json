@@ -1,0 +1,27 @@
+{
+  "name": "playwright-checkout-guard",
+  "version": "1.0.0",
+  "description": "Playwright, Typescript and POM model.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martjustin/Playwright-checkout-guard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/martjustin/Playwright-checkout-guard/issues"
+  },
+  "homepage": "https://github.com/martjustin/Playwright-checkout-guard#readme",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.2",
+    "@faker-js/faker": "^10.4.0",
+    "@playwright/test": "^1.59.1",
+    "typescript": "^6.0.3"
+  }
+}
