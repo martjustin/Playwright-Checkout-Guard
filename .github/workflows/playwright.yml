@@ -1,0 +1,52 @@
+name: Playwright E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    timeout-minutes: 30
+    # Playwright tests take longer than unit tests — 30 min is reasonable
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+        # npm ci = "clean install"
+        # Faster than npm install, uses package-lock.json exactly
+        # Never modifies package-lock.json — ensures reproducible builds
+      
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+        # Downloads the actual browser binaries
+        # --with-deps installs OS-level dependencies (fonts, codecs, etc.)
+        # In CI we install all 3 browsers; locally you might just use chromium
+      
+      - name: Run smoke tests first
+        run: npx playwright test --grep "@smoke" --reporter=list
+        # Run ONLY tests tagged @smoke first (fast pass/fail signal)
+        # --reporter=list shows real-time output in CI logs
+      
+      - name: Run full test suite
+        if: success()
+        run: npx playwright test
+        # Only runs if smoke tests passed
+      
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 30
