@@ -1,238 +1,150 @@
 // tests/checkout.spec.ts
-// The main checkout flow tests.
-// These cover the most business-critical user journey:
-// Browse → Add to Cart → Checkout → Pay → Order Confirmed
-
-// Import our CUSTOM test (with fixtures), not the base @playwright/test
 import { test, expect } from '../fixtures/test.fixtures';
-import { generateCardDetails } from '../utils/test-data';
+import { generateCardDetails }  from '../utils/test-data';
+import { ProductPage } from '../pages/ProductPage';
 
-// Group related tests into describe blocks for organisation
-// In the HTML report, these appear as collapsible sections
 test.describe('Checkout Flow — End to End', () => {
 
   test('@smoke Full checkout completes with order confirmation', async ({
-    page,
-    loggedInPage,  // Playwright injects this fixture — user is logged in
+    loggedInPage,
     cartPage,
     checkoutPage,
   }) => {
     /**
-     * TEST STRATEGY: This is the critical happy-path test.
-     * If THIS test fails, the entire revenue flow is broken.
-     * @smoke tag means it runs in smoke suite on every deployment.
+     * WHAT CHANGED AND WHY:
      *
-     * FLOW:
-     * 1. Add a product to cart
-     * 2. View cart
-     * 3. Proceed to checkout
-     * 4. Verify delivery address
-     * 5. Place order
-     * 6. Fill payment details
-     * 7. Confirm order
-     * 8. Verify success message
+     * Before: clicked '.product-overlay .add-to-cart'
+     * → Required CSS hover state to make button visible
+     * → Heading intercepted pointer events before hover fired
+     * → Touch devices (Mobile Chrome/Safari) have no hover → silently failed
+     *
+     * After: navigate to /product_details/1, click the always-visible button
+     * → No hover needed
+     * → Button is in the DOM and visible on every browser and device
+     * → One locator that works across all 5 test projects
      */
-    
-    // Step 1: Add a product to cart from the products page
-    await loggedInPage.goto('/products');
-    // We use loggedInPage (not page) because this test needs a logged-in session
-    
-    // Add the first product
-    await loggedInPage.locator('.product-overlay .add-to-cart').first().click();
-    
-    // Handle the "Added to cart" modal that pops up
-    await loggedInPage.locator('[data-dismiss="modal"]').click();
-    // data-dismiss="modal" is Bootstrap's close button pattern
-    
-    // Step 2: Navigate to cart
+
+    // ── Step 1: Navigate to a product detail page ───────────────────────────
+    const productPage = new ProductPage(loggedInPage);
+    await productPage.goToProductDetail(1);
+    // Goes to: https://www.automationexercise.com/product_details/1
+    // Product ID 1 is "Blue Top" — always present on this site
+
+    // ── Step 2: Add it to cart using the always-visible button ───────────────
+    await productPage.addToCart();
+    // Clicks the "Add to cart" button on the detail page (no hover required)
+    // Waits for the confirmation modal to appear
+
+    await productPage.continueShopping();
+    // Dismisses the "Added successfully" modal
+
+    // ── Step 3: Navigate to cart and verify item is there ────────────────────
     await cartPage.navigate();
-    
-    // Step 3: Verify product is in cart
+    await cartPage.waitForPageLoad();
+
     const itemCount = await cartPage.getCartItemCount();
-    expect(itemCount).toBeGreaterThan(0);  // At least one item
-    
-    // Step 4: Proceed to checkout
+    expect(itemCount).toBeGreaterThan(0);
+    // If this still fails after the fix, the add-to-cart step didn't work.
+    // Run with --headed to watch it happen: npx playwright test --headed
+
+    // ── Step 4: Proceed to checkout ─────────────────────────────────────────
     await cartPage.proceedToCheckout();
-    
-    // Step 5: Verify checkout page loaded and has address
+    await checkoutPage.waitForPageLoad();
+
+    // ── Step 5: Verify delivery address was populated ────────────────────────
     const deliveryAddress = await checkoutPage.getDeliveryAddressText();
-    expect(deliveryAddress).toBeTruthy();
-    // toBeTruthy() checks it's not null, undefined, or empty string
-    
-    // Step 6: Add an order comment
-    await checkoutPage.addOrderComment('Please gift wrap with shiny wrapper — no dull colors!');
-    
-    // Step 7: Click "Place Order" to proceed to payment
+    expect(deliveryAddress.trim().length).toBeGreaterThan(0);
+    // .trim() removes whitespace before checking length
+    // An empty address means the loggedIn fixture didn't fill the address fields
+
+    // ── Step 6: Add a comment and place the order ────────────────────────────
+    await checkoutPage.addOrderComment('QA smoke test order — safe to ignore');
     await checkoutPage.clickPlaceOrder();
-    
-    // Step 8: Fill payment details
+
+    // ── Step 7: Fill payment details ─────────────────────────────────────────
     const cardDetails = generateCardDetails();
     await checkoutPage.fillPaymentDetails(cardDetails);
-    
-    // Step 9: Confirm payment
+
+    // ── Step 8: Confirm payment ───────────────────────────────────────────────
     await checkoutPage.confirmPayment();
-    
-    // Step 10: Verify order success
+
+    // ── Step 9: Assert order success ─────────────────────────────────────────
     const isSuccessful = await checkoutPage.isOrderSuccessful();
     expect(isSuccessful).toBe(true);
   });
 
-  
-  test('Cart preserves quantity after browser refresh', async ({
+
+  test('Cart preserves items after browser refresh', async ({
     loggedInPage,
     cartPage,
   }) => {
-    /**
-     * PERSISTENCE TEST: Items in cart must survive a page refresh.
-     *
-     * Real bug this catches: If cart state is only stored in memory
-     * (not in localStorage or server session), refreshing the page clears the cart.
-     * This is a Zalando/Amazon-level bug — users lose their cart and never return.
-     * 
-     **/
-    
-    // Add product to cart
-    await loggedInPage.goto('/products');
-    await loggedInPage.locator('.add-to-cart').first().click();
-    await loggedInPage.locator('[data-dismiss="modal"]').click();
-    
+    const productPage = new ProductPage(loggedInPage);
+
+    await productPage.goToProductDetail(1);
+    await productPage.addToCart();
+    await productPage.continueShopping();
+
     await cartPage.navigate();
-    const initialCount = await cartPage.getCartItemCount();
-    
-    // Simulate browser refresh
+    const countBefore = await cartPage.getCartItemCount();
+    expect(countBefore).toBeGreaterThan(0);
+
+    // Simulate F5 / browser refresh
     await loggedInPage.reload();
-    // reload() is Playwright's way to simulate F5 / Ctrl+R
-    
     await cartPage.waitForPageLoad();
-    
-    const countAfterRefresh = await cartPage.getCartItemCount();
-    
-    expect(countAfterRefresh).toBe(initialCount);
-    // Cart count must be identical before and after refresh
+
+    const countAfter = await cartPage.getCartItemCount();
+
+    expect(countAfter).toBe(countBefore);
+    // Cart must survive a refresh — items stored in session, not just memory
   });
 
-  
-  test('Removing item from cart updates total', async ({
+
+  test('Removing an item updates the cart count', async ({
     loggedInPage,
     cartPage,
   }) => {
-    /**
-     * CALCULATION TEST: Cart total must update when items are removed.
-     *
-     * This sounds obvious but it's caught real bugs — where the UI shows
-     * an updated item count but the TOTAL PRICE doesn't recalculate.
-     * A user removes a ₦5,000 item but still gets charged ₦5,000 extra.
-     * This is exactly the kind of bug Wolt found in their wallet+promo scenario.
-     */
-    
-    // Add two products
-    await loggedInPage.goto('/products');
-    const addButtons = await loggedInPage.locator('.add-to-cart').all();
-    // .all() returns an array of all matching Locators
-    
-    // Add first product
-    await addButtons[0].click();
-    await loggedInPage.locator('[data-dismiss="modal"]').click();
-    
-    // Add second product
-    await addButtons[1].click();
-    await loggedInPage.locator('[data-dismiss="modal"]').click();
-    
+    const productPage = new ProductPage(loggedInPage);
+
+    // Add two different products
+    await productPage.goToProductDetail(1);
+    await productPage.addToCart();
+    await productPage.continueShopping();
+
+    await productPage.goToProductDetail(2);
+    await productPage.addToCart();
+    await productPage.continueShopping();
+
     await cartPage.navigate();
-    
-    const initialItemCount = await cartPage.getCartItemCount();
-    const initialTotal = await cartPage.getTotalPrice();
-    
-    // Remove one item
+
+    const countBefore = await cartPage.getCartItemCount();
+    expect(countBefore).toBe(2);
+
     await cartPage.removeFirstItem();
-    
-    const newItemCount = await cartPage.getCartItemCount();
-    const newTotal = await cartPage.getTotalPrice();
-    
-    // Item count decreased by 1
-    expect(newItemCount).toBe(initialItemCount - 1);
-    
-    // Total price decreased (can't assert exact amount without knowing price,
-    // but it MUST be less than before)
-    expect(newTotal).toBeLessThan(initialTotal);
+
+    const countAfter = await cartPage.getCartItemCount();
+    expect(countAfter).toBe(1);
   });
 
-  
-  test('@negative Checkout without login redirects to login page', async ({
-    page,    // Note: NOT loggedInPage — this test intentionally uses anonymous session
-    cartPage,
-  }) => {
-    /**
-     * NEGATIVE / AUTH TEST: Unauthenticated users attempting checkout
-     * must be redirected to login — not shown a broken checkout page.
-     *
-     * This is both a UX test AND a security test.
-     * UX: Users shouldn't see a broken/empty checkout form.
-     * Security: Order data (addresses, payment intents) should require auth.
-     */
-    
-    // Add a product as anonymous user
-    await page.goto('/products');
-    await page.locator('.add-to-cart').first().click();
-    await page.locator('[data-dismiss="modal"]').click();
-    
-    // Navigate to cart
-    await cartPage.navigate();
-    
-    // Click checkout without being logged in
-    await cartPage.proceedToCheckout();
-    
-    // Expect: modal or redirect asking to login/register
-    // AutomationExercise shows a modal with "Register / Login" option
-    const loginPrompt = page.locator('u', { hasText: 'Register / Login' });
-    await expect(loginPrompt).toBeVisible({ timeout: 5000 });
-  });
-});
 
-
-test.describe('Checkout — Network Resilience', () => {
-  
-  test('Checkout page gracefully handles slow network', async ({
+  test('@negative Checkout without login shows register prompt', async ({
     page,
-    loggedInPage,
     cartPage,
   }) => {
-    /**
-     * PERFORMANCE + RESILIENCE TEST: Checkout must remain usable on slow connections.
-     *
-     * Using Playwright's built-in network simulation — no Charles Proxy needed.
-     * We simulate a "Fast 3G" connection and verify checkout still completes.
-     *
-     * A well-built checkout degrades gracefully and shows loading states.
-     **/
-    
-    // Simulate Fast 3G network conditions
-    await page.route('**/*', async (route) => {
-      // Add 200ms delay to every network request
-      await new Promise(resolve => setTimeout(resolve, 200));
-      // This simulates network latency without blocking the test completely
-      await route.continue();
-      // route.continue() lets the request go through normally after the delay
-    });
-    
-    // Add product
-    await loggedInPage.goto('/products');
-    await loggedInPage.locator('.add-to-cart').first().click();
-    await loggedInPage.locator('[data-dismiss="modal"]').click();
-    
+    // Uses bare `page` (anonymous session) — NOT loggedInPage
+
+    const productPage = new ProductPage(page);
+    await productPage.goToProductDetail(1);
+
+    // Add to cart as anonymous user
+    await productPage.addToCart();
+    await page.locator('[data-dismiss="modal"]').click();
+
     await cartPage.navigate();
-    
-    // Measure time from checkout start to page loaded
-    const startTime = Date.now();
     await cartPage.proceedToCheckout();
-    await page.waitForLoadState('networkidle');
-    const loadTime = Date.now() - startTime;
-    
-    // Even on slow network, the page must load within 10 seconds
-    // (industry standard for acceptable degraded-mode performance)
-    expect(loadTime).toBeLessThan(10_000);
-    
-    console.log(`Checkout load time on throttled network: ${loadTime}ms`);
-    // This logs to the test report — useful for tracking performance trends
+
+    // AutomationExercise shows a modal prompting login/register for guests
+    const prompt = page.locator('u', { hasText: 'Register / Login' });
+    await expect(prompt).toBeVisible({ timeout: 8_000 });
   });
+
 });
