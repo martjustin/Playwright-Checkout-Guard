@@ -1,16 +1,45 @@
-// fixtures/test.fixtures.ts  — loggedInPage fixture teardown section only
-// (keep everything else the same, only change the teardown block)
+import { test as base, expect, Page } from '@playwright/test';
+import { HomePage }     from '../pages/HomePage';
+import { CartPage }     from '../pages/CartPage';
+import { CheckoutPage } from '../pages/CheckoutPage';
+import { generateUser } from '../utils/test-data';
+
+type CustomFixtures = {
+  homePage:      HomePage;
+  cartPage:      CartPage;
+  checkoutPage:  CheckoutPage;
+  loggedInPage:  Page;
+};
+
+export const test = base.extend<CustomFixtures>({
+
+  homePage: async ({ page }, use) => {
+    await use(new HomePage(page));
+  },
+
+  cartPage: async ({ page }, use) => {
+    await use(new CartPage(page));
+  },
+
+  checkoutPage: async ({ page }, use) => {
+    await use(new CheckoutPage(page));
+  },
 
   loggedInPage: async ({ page }, use) => {
 
-    // ── SETUP: create and log in a fresh user ───────────────────────────────
+    // ── SETUP ────────────────────────────────────────────────────────────────
     const testUser = generateUser();
 
-    await page.goto('/login');
+    // Navigate with domcontentloaded — don't wait for ads
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+
+    // Fill signup section (right column of the /login page)
     await page.locator('[data-qa="signup-name"]').fill(testUser.name);
     await page.locator('[data-qa="signup-email"]').fill(testUser.email);
     await page.locator('[data-qa="signup-button"]').click();
 
+    // Account details form
+    await page.waitForLoadState('domcontentloaded');
     await page.locator('#id_gender1').check();
     await page.locator('[data-qa="password"]').fill(testUser.password);
     await page.locator('[data-qa="first_name"]').fill(testUser.firstName);
@@ -23,28 +52,34 @@
     await page.locator('[data-qa="mobile_number"]').fill(testUser.phone);
     await page.locator('[data-qa="create-account"]').click();
 
-    await page.waitForSelector('[data-qa="account-created"]');
+    // Wait for the "Account Created!" confirmation
+    await page.waitForSelector('[data-qa="account-created"]', { timeout: 20_000 });
     await page.locator('[data-qa="continue-button"]').click();
+    await page.waitForLoadState('domcontentloaded');
 
     // ── HAND OFF to the test ─────────────────────────────────────────────────
     await use(page);
 
-    // ── TEARDOWN: delete the account after the test finishes ─────────────────
-    // ✅ FIX: Wrap teardown in try/catch.
-    // If the test timed out, the page may already be in a broken or closed state.
-    // Without try/catch, a teardown failure would mask the REAL test failure
-    // and make the error log confusing.
+    // ── TEARDOWN ─────────────────────────────────────────────────────────────
+    // Wrapped in try/catch because:
+    //   1. If the test timed out, the page may already be closed or navigating.
+    //   2. A teardown crash would mask the real test failure in the report.
+    //   3. We log a warning so the sandbox account isn't silently left behind.
     try {
-      await page.goto('/delete_account', { timeout: 15_000 });
-      // Give the delete navigation its own timeout so a slow response
-      // doesn't block the next test from starting
-    } catch (error) {
+      await page.goto('/delete_account', {
+        waitUntil: 'domcontentloaded',
+        timeout: 20_000,
+      });
+      // automationexercise.com deletes the account when you navigate to this URL.
+      // No button click required — the page itself triggers deletion.
+    } catch {
       console.warn(
-        `[FIXTURE] Could not delete test account for ${testUser.email}. ` +
-        `Page may have been closed by a test timeout. ` +
-        `Manual cleanup may be needed in the AutomationExercise dashboard.`
+        `[TEARDOWN] Could not delete account for ${testUser.email}. ` +
+        `This is usually because the test timed out before teardown ran. ` +
+        `The account will remain in the sandbox — no real data at risk.`
       );
-      // Log the warning but don't rethrow — we don't want a cleanup
-      // failure to mark a passed test as failed
     }
   },
+});
+
+export { expect };
