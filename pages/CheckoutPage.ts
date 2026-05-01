@@ -39,6 +39,7 @@ export class CheckoutPage extends BasePage {
     this.billingAddress = page.locator('#address_invoice');
     
     this.orderItems = page.locator('#cart_info tbody tr');
+    this.orderTotal = page.locator('.cart_total_price');
     
     this.orderCommentBox = page.locator('textarea[name="message"]');
     this.placeOrderButton = page.locator('a[href="/payment"]');

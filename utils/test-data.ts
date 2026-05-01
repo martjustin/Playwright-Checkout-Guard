@@ -49,7 +49,7 @@ export function generateUser(): TestUser {
     city: faker.location.city(),
     state: faker.location.state(),
     zipcode: faker.location.zipCode('#####'),  // 5-digit US format
-    phone: faker.phone.number('##########'),   // 10-digit format
+    phone: faker.string.numeric(10),   // 10-digit format
   };
 }
 
@@ -64,7 +64,7 @@ export function generateCardDetails(): CardDetails {
   
   return {
     nameOnCard: faker.person.fullName(),
-    cardNumber: testCards[0],  // Use the Visa success card by default
+    cardNumber: testCards[0]!,  // Use the Visa success card by default
     cvv: faker.string.numeric(3),        // 3-digit CVV
     expiryMonth: faker.date.future().toLocaleString('en', { month: '2-digit' }),
     expiryYear: String(new Date().getFullYear() + 2),  // 2 years from now

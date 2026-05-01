@@ -32,7 +32,7 @@ export class BasePage {
     await locator.scrollIntoViewIfNeeded();
   }
 
-  async takeScreenshot(name: string): Promise<Buffer> {
+  async takeScreenshot(name: string): Promise<Uint8Array> {
     return await this.page.screenshot({
       path: `screenshots/${name}.png`,
       fullPage: false,

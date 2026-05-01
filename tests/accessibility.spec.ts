@@ -103,7 +103,7 @@ test.describe('Accessibility Compliance', () => {
     
     // Run targeted axe scan on ONLY the checkout form
     // Scoping reduces noise from other page elements
-    const results = await new AxeBuilder({ loggedInPage: loggedInPage as any })
+    const results = await new AxeBuilder({ page: loggedInPage })
       .include('#checkout_form_group')
       // .include() scopes the scan to a specific CSS selector
       // We only check the checkout form, not the entire page

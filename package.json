@@ -4,7 +4,8 @@
   "description": "Playwright, Typescript and POM model.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",
