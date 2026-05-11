@@ -13,7 +13,7 @@ export class CartPage extends BasePage {
   constructor(page: Page) {
     super(page, '/view_cart');
 
-    this.cartItems    = page.locator('tr.cart_item');
+    this.cartItems    = page.locator('#cart_info tbody tr[id^="product-"]');
     this.productNames = page.locator('td.cart_description h4 a');
     this.deleteButtons = page.locator('td.cart_delete a');
 
@@ -37,7 +37,7 @@ export class CartPage extends BasePage {
     // More permissive than class*= and works even if class order changes.
 
     this.emptyCartMessage = page.locator('#empty_cart');
-    this.totalPriceCell   = page.locator('td.cart_total_price');
+    this.totalPriceCell   = page.locator('.cart_total .cart_total_price');
   }
 
   async getCartItemCount(): Promise<number> {
@@ -51,11 +51,12 @@ export class CartPage extends BasePage {
   }
 
   async removeFirstItem(): Promise<void> {
+    const countBefore = await this.cartItems.count();
     await this.deleteButtons.first().click();
 
-    // After deletion, the table row is removed from the DOM.
-    // Wait for the page to re-render before the next assertion.
-    await this.page.waitForLoadState('domcontentloaded');
+    await expect(this.cartItems).toHaveCount(Math.max(countBefore - 1, 0), {
+      timeout: 15_000,
+    });
   }
 
   async isCartEmpty(): Promise<boolean> {

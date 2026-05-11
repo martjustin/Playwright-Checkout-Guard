@@ -92,6 +92,10 @@ export class CheckoutPage extends BasePage {
   async confirmPayment(): Promise<void> {
     await this.waitAndClick(this.confirmOrderButton);
     await this.waitForPageLoad();
+    await this.orderSuccessMessage.waitFor({
+      state: 'visible',
+      timeout: 20_000,
+    });
   }
 
   async isOrderSuccessful(): Promise<boolean> {

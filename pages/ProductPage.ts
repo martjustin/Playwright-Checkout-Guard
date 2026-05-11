@@ -68,11 +68,14 @@ export class ProductPage extends BasePage {
     // from within the same request lifecycle as the add-to-cart confirmation.
     // The cart cookie is already set. You arrive at a cart with your item in it.
     await this.viewCartInModalButton.waitFor({ state: 'visible' });
-    await this.viewCartInModalButton.click();
 
-    // Wait for the cart page to finish loading
-    await this.page.waitForLoadState('domcontentloaded');
-    await this.page.waitForURL('**/view_cart', { timeout: 15_000 });
+    await Promise.all([
+      this.page.waitForURL('**/view_cart', {
+        timeout: 15_000,
+        waitUntil: 'domcontentloaded',
+      }),
+      this.viewCartInModalButton.click(),
+    ]);
     // waitForURL confirms we actually arrived at /view_cart, not that
     // we're still on the product page with a partially-loaded response.
   }

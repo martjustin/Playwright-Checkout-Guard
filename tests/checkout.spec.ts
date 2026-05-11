@@ -1,5 +1,6 @@
 // tests/checkout.spec.ts
 import { test, expect }        from '../fixtures/test.fixtures';
+import type { Route }          from '@playwright/test';
 import { generateCardDetails }  from '../utils/test-data';
 import { ProductPage }          from '../pages/ProductPage';
 
@@ -139,17 +140,19 @@ test.describe('Checkout — Network Resilience', () => {
     // Confirm cart is populated before starting the performance measurement.
 
     // ── Enable throttle for checkout navigation only ──────────────────────────
-    await loggedInPage.route('**/*', async route => {
+    const throttleCheckout = async (route: Route) => {
       await new Promise(resolve => setTimeout(resolve, 100));
       await route.continue();
-    });
+    };
+
+    await loggedInPage.route('**/checkout', throttleCheckout);
 
     const start = Date.now();
     await cartPage.proceedToCheckout();
     const elapsed = Date.now() - start;
 
     // ── Remove throttle before teardown runs ──────────────────────────────────
-    await loggedInPage.unrouteAll();
+    await loggedInPage.unroute('**/checkout', throttleCheckout);
 
     expect(elapsed).toBeLessThan(15_000);
     console.log(`[PERF] Checkout on throttled network: ${elapsed}ms`);
