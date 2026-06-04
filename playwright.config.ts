@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
-const isCI = !!env.CI;
+const isCI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './tests',
