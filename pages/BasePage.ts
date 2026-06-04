@@ -9,12 +9,12 @@ export class BasePage {
     this.path = path;
   }
 
-  async navigate(): Promise<void> {
+  async navigate(path: string = '/') {
     // waitUntil: 'domcontentloaded' fires as soon as the HTML is parsed.
     // The default 'load' waits for every ad, tracker, and third-party script
     // on automationexercise.com to finish — which causes navigation timeouts.
     // Our tests only need the DOM to be ready, not every resource loaded.
-    await this.page.goto(this.path, { waitUntil: 'domcontentloaded' });
+    await this.page.goto(path, { waitUntil: 'domcontentloaded' });
   }
 
   async waitForPageLoad(): Promise<void> {
