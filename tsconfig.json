@@ -1,8 +1,9 @@
+// tsconfig.json
 {
   "compilerOptions": {
     "module": "commonjs",
     "target": "es2022",
-    "types": ["@playwright/test"],
+    "types": ["@playwright/test", "node"],
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
